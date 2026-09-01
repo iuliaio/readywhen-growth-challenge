@@ -21,11 +21,16 @@ export default function InboxPage() {
   }, [ready, session.signedIn, unlocked, router]);
 
   const firstConnector = session.connected[0] ?? "none";
+  const { flowVariant } = session;
   useEffect(() => {
     if (ready && session.signedIn && unlocked) {
-      track("board.viewed", { firstConnector, timeSinceSignup: elapsedSince("signup:done") });
+      track("board.viewed", {
+        firstConnector,
+        variant: flowVariant,
+        timeSinceSignup: elapsedSince("signup:done"),
+      });
     }
-  }, [ready, session.signedIn, unlocked, firstConnector]);
+  }, [ready, session.signedIn, unlocked, firstConnector, flowVariant]);
 
   if (!ready || !session.signedIn || !unlocked) return null;
 

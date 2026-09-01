@@ -33,7 +33,7 @@ export default function WelcomePage() {
     track("onboarding.step_viewed", { step });
     if (step === "tools") {
       restartClock("connector:picker");
-      track("connector.picker_viewed", { source: "welcome" });
+      track("connector.picker_viewed", { source: "welcome", variant: session.flowVariant });
     }
   }, [step]);
 
@@ -97,6 +97,7 @@ export default function WelcomePage() {
               track("connector.selected", {
                 connector: tool.slug,
                 source: "welcome",
+                variant: session.flowVariant,
                 timeToChoose: elapsedSince("connector:picker"),
               });
               restartClock("connector:consent");
@@ -132,6 +133,7 @@ export default function WelcomePage() {
             track("connector.declined", {
               connector: pendingConnect.slug,
               source: "welcome",
+              variant: session.flowVariant,
               timeOnConsentScreen: elapsedSince("connector:consent"),
             });
             setPendingConnect(null);
@@ -141,6 +143,7 @@ export default function WelcomePage() {
             track("connector.connected", {
               connector: pendingConnect.slug,
               source: "welcome",
+              variant: session.flowVariant,
               timeOnConsentScreen: elapsedSince("connector:consent"),
               timeSinceSignup: elapsedSince("signup:done"),
             });

@@ -7,7 +7,11 @@
 // ── Sign-in ────────────────────────────────────────────────────────────────
 export const SOCIAL_PROVIDERS = [
   { id: "google", label: "Continue with Google", iconSrc: "/icons/google.svg" },
-  { id: "microsoft", label: "Continue with Microsoft", iconSrc: "/icons/outlook.svg" },
+  {
+    id: "microsoft",
+    label: "Continue with Microsoft",
+    iconSrc: "/icons/outlook.svg",
+  },
 ] as const;
 
 // ── Step 2: the sign-up survey ─────────────────────────────────────────────
@@ -15,7 +19,15 @@ export const SURVEY_FIELDS = [
   {
     key: "headcount",
     label: "Company headcount",
-    options: ["1–10", "11–50", "51–200", "201–500", "501–1,000", "1,001–5,000", "5,000+"],
+    options: [
+      "1–10",
+      "11–50",
+      "51–200",
+      "201–500",
+      "501–1,000",
+      "1,001–5,000",
+      "5,000+",
+    ],
   },
   {
     key: "role",
@@ -98,7 +110,11 @@ export const WORK_TOOLS: readonly Tool[] = [
   { slug: "calendar", name: "Calendar", iconSrc: "/icons/google-calendar.svg" },
   { slug: "meet", name: "Meet", iconSrc: "/icons/google-meet.svg" },
   { slug: "hubspot", name: "HubSpot", iconSrc: "/icons/hubspot.png" },
-  { slug: "google-drive", name: "Google Drive", iconSrc: "/icons/google-drive.svg" },
+  {
+    slug: "google-drive",
+    name: "Google Drive",
+    iconSrc: "/icons/google-drive.svg",
+  },
   { slug: "salesforce", name: "Salesforce", iconSrc: "/icons/salesforce.svg" },
   { slug: "fathom", name: "Fathom", iconSrc: "/icons/fathom.svg" },
   { slug: "teams", name: "Teams", iconSrc: "/icons/microsoft-teams.svg" },
@@ -114,14 +130,29 @@ export function toolBySlug(slug: string): Tool | undefined {
 // ── Step 5: what is slowing you down ───────────────────────────────────────
 export const JTBD_OPTIONS = [
   { slug: "slow-to-get-back-to-clients", title: "Client emails are piling up" },
-  { slug: "things-fall-through-cracks", title: "Things fall through the cracks" },
-  { slug: "no-time-to-chase-new-business", title: "I don't have time to chase new business" },
-  { slug: "work-stuck-waiting-on-someone", title: "Work gets stuck waiting on someone else" },
-  { slug: "juggling-multiple-businesses", title: "I'm juggling more than one business" },
+  {
+    slug: "things-fall-through-cracks",
+    title: "Things fall through the cracks",
+  },
+  {
+    slug: "no-time-to-chase-new-business",
+    title: "I don't have time to chase new business",
+  },
+  {
+    slug: "work-stuck-waiting-on-someone",
+    title: "Work gets stuck waiting on someone else",
+  },
+  {
+    slug: "juggling-multiple-businesses",
+    title: "I'm juggling more than one business",
+  },
 ] as const;
 
 /** The agent's opening line, tuned to the pain the user picked. */
-export function openingLine(jtbd: string | null, firstName: string | null): string {
+export function openingLine(
+  jtbd: string | null,
+  firstName: string | null,
+): string {
   const hi = firstName ? `Hey ${firstName}, great to see you. ` : "Hi 👋 ";
   switch (jtbd) {
     case "slow-to-get-back-to-clients":
@@ -147,7 +178,8 @@ export const BRAIN_SUBTITLE =
 /** Working days from "I can see your work" to the reveal. */
 export const WORKING_DAYS_TO_UNLOCK = 5;
 
-export const COUNTDOWN_DESCRIPTION = "until I show you what I've learned about your business.";
+export const COUNTDOWN_DESCRIPTION =
+  "until I show you what I've learned about your business.";
 export const COUNTDOWN_FOOTNOTE = "I'm reading your work from today.";
 
 export function countdownUnit(days: number): string {
@@ -163,17 +195,20 @@ export const QUESTIONS = [
   {
     key: "business",
     label: "What does your business do?",
-    placeholder: "The one-liner you'd give someone new. What you sell, and who buys it.",
+    placeholder:
+      "The one-liner you'd give someone new. What you sell, and who buys it.",
   },
   {
     key: "priorities",
     label: "What are your priorities to keep your business running?",
-    placeholder: "Day to day, and the bigger thing you're driving this quarter.",
+    placeholder:
+      "Day to day, and the bigger thing you're driving this quarter.",
   },
   {
     key: "people",
     label: "Who do you work with most?",
-    placeholder: "Names help. Your team, your customers, anyone you can't drop the ball on.",
+    placeholder:
+      "Names help. Your team, your customers, anyone you can't drop the ball on.",
   },
 ] as const;
 
@@ -214,21 +249,22 @@ export const FOUND_COMMITMENTS = [
     due: "due Friday",
     source: "Gmail",
     iconSrc: "/icons/gmail.svg",
-    quote: "\"Could you send over the invoice for June? Want to get it paid this week.\"",
+    quote:
+      '"Could you send over the invoice for June? Want to get it paid this week."',
   },
   {
     title: "Share the pricing deck with Rin",
     due: "due today",
     source: "Slack",
     iconSrc: "/icons/slack.svg",
-    quote: "\"Can you drop me the latest pricing deck before the Acme call?\"",
+    quote: '"Can you drop me the latest pricing deck before the Acme call?"',
   },
   {
     title: "Follow up with Acme after Tuesday's call",
     due: "overdue by 2 days",
     source: "Calendar",
     iconSrc: "/icons/google-calendar.svg",
-    quote: "\"I'll come back to you with next steps by end of week.\"",
+    quote: '"I\'ll come back to you with next steps by end of week."',
   },
 ];
 
@@ -237,6 +273,14 @@ export const DRAFT_REPLY = {
   subject: "Re: June invoice",
   body: "Hi Tom.\n\nThanks, glad last month went well. June invoice attached, due in 14 days. Shout if anything is unclear.\n\nBest,",
 };
+
+// ── Chat-first onboarding (flow-shape experiment) ──────────────────────────
+
+export const CHAT_FIRST_OPENER =
+  "Tell me what you need to get done, or something you owe someone — I'll take it from there.";
+
+export const CHAT_FIRST_CONNECT_PROMPT =
+  "Got it. To actually chase this down I need to see where your work happens — connect one place to start.";
 
 /** Canned answers, cycled in order. A demo, not a model. */
 export const CANNED_REPLIES = [

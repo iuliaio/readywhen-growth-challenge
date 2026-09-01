@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { type FlowVariant } from "./experiments";
 
 /**
  * The entire "backend". Everything the funnel collects lives here and is mirrored
@@ -23,6 +24,8 @@ export interface Session {
   firstName: string;
   lastName: string;
   survey: Record<string, string>;
+  /** The onboarding-shape arm this user was assigned at sign-up. */
+  flowVariant: FlowVariant;
   jtbd: string | null;
   jtbdDetail: string;
   connected: string[];
@@ -39,6 +42,7 @@ export const EMPTY_SESSION: Session = {
   firstName: "",
   lastName: "",
   survey: {},
+  flowVariant: "control",
   jtbd: null,
   jtbdDetail: "",
   connected: [],
@@ -68,7 +72,9 @@ interface Store {
 
 const SessionContext = createContext<Store | null>(null);
 
-export function SessionProvider({ children }: Readonly<{ children: ReactNode }>) {
+export function SessionProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   const [session, setSession] = useState<Session>(EMPTY_SESSION);
   // `ready` gates the first paint on the client read: rendering the stored
   // session during SSR is impossible, and rendering the empty one would bounce a
@@ -106,13 +112,19 @@ export function SessionProvider({ children }: Readonly<{ children: ReactNode }>)
     setSession(EMPTY_SESSION);
   }, []);
 
-  const value = useMemo(() => ({ session, ready, update, reset }), [session, ready, update, reset]);
+  const value = useMemo(
+    () => ({ session, ready, update, reset }),
+    [session, ready, update, reset],
+  );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): Store {
   const store = useContext(SessionContext);
-  if (!store) throw new Error("useSession must be used inside <SessionProvider>");
+  if (!store)
+    throw new Error("useSession must be used inside <SessionProvider>");
   return store;
 }

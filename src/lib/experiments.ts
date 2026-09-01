@@ -26,18 +26,21 @@ export interface Experiment {
 }
 
 /**
- * A worked example, so the mechanism is live rather than theoretical: load
- * `/signup?signup-headline=direct` and the heading changes. It is deliberately
- * trivial — replace it with your own.
+ * Chat-first onboarding. `control` is the funnel as Task 2 left it: sign up →
+ * five welcome steps → chat. `chat-first` skips the welcome steps entirely,
+ * drops the user straight into chat, and uses their first message as the moment
+ * to ask for a source connection. Switch arms with `/signup?flow-shape=chat-first`.
  */
-export const SIGNUP_HEADLINE: Experiment = {
-  key: "signup-headline",
-  variants: ["control", "direct"],
+export const FLOW_SHAPE = {
+  key: "flow-shape",
+  variants: ["control", "chat-first"],
   traffic: 0.5,
-};
+} as const satisfies Experiment;
+
+export type FlowVariant = (typeof FLOW_SHAPE)["variants"][number];
 
 /** Register your experiments here. */
-export const EXPERIMENTS: readonly Experiment[] = [SIGNUP_HEADLINE];
+export const EXPERIMENTS: readonly Experiment[] = [FLOW_SHAPE];
 
 /**
  * The arm to render. The control unless the URL names another one.
@@ -49,7 +52,9 @@ export function useVariant(experiment: Experiment): string {
   const [variant, setVariant] = useState(experiment.variants[0]);
 
   useEffect(() => {
-    const asked = new URLSearchParams(window.location.search).get(experiment.key);
+    const asked = new URLSearchParams(window.location.search).get(
+      experiment.key,
+    );
     if (asked && experiment.variants.includes(asked)) setVariant(asked);
   }, [experiment]);
 

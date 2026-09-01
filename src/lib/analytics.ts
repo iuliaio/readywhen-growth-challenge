@@ -1,8 +1,9 @@
+import { type FlowVariant } from "./experiments";
 import { recordBusinessEvent, type BusinessEventTags } from "./metrics";
 
 type AuthIntent = "login" | "signup";
 type OnboardingStep = "org" | "profile" | "explainer" | "tools" | "slips";
-type ConnectSource = "welcome" | "chat";
+export type ConnectSource = "welcome" | "chat" | "chat_first";
 
 export type TimeSpan =
   | "<2s"
@@ -17,13 +18,12 @@ export type CountRange = "1" | "2-3" | "4-5" | "6+";
 type NoTags = Record<string, never>;
 
 export type FunnelEvents = {
-  "signup.headline_viewed": { headlineVariant: string; authIntent: AuthIntent };
   "signup.completed": {
     provider: string;
-    headlineVariant: string;
     authIntent: AuthIntent;
     timeOnScreen: TimeSpan;
   };
+  "experiment.flow_shape_exposed": { variant: FlowVariant };
   "onboarding.step_viewed": { step: OnboardingStep };
   "onboarding.step_completed": { step: OnboardingStep; timeOnStep: TimeSpan };
   "onboarding.step_left": {
@@ -31,24 +31,39 @@ export type FunnelEvents = {
     direction: "back";
     timeOnStep: TimeSpan;
   };
-  "connector.picker_viewed": { source: ConnectSource };
-  "connector.selected": { connector: string; source: ConnectSource; timeToChoose: TimeSpan };
+  "connector.picker_viewed": { source: ConnectSource; variant: FlowVariant };
+  "connector.selected": {
+    connector: string;
+    source: ConnectSource;
+    variant: FlowVariant;
+    timeToChoose: TimeSpan;
+  };
   "connector.declined": {
     connector: string;
     source: ConnectSource;
+    variant: FlowVariant;
     timeOnConsentScreen: TimeSpan;
   };
   "connector.connected": {
     connector: string;
     source: ConnectSource;
+    variant: FlowVariant;
     timeOnConsentScreen: TimeSpan;
     timeSinceSignup: TimeSpan;
   };
-  "chat.message_sent": { messageNumber: CountRange; firstConnector: string };
+  "chat.message_sent": {
+    messageNumber: CountRange;
+    firstConnector: string;
+    variant: FlowVariant;
+  };
   "chat.commitments_viewed": NoTags;
   "chat.draft_viewed": NoTags;
   "chat.draft_sent": NoTags;
-  "board.viewed": { firstConnector: string; timeSinceSignup: TimeSpan };
+  "board.viewed": {
+    firstConnector: string;
+    variant: FlowVariant;
+    timeSinceSignup: TimeSpan;
+  };
 };
 
 export function track<K extends keyof FunnelEvents>(

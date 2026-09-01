@@ -9,10 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { elapsedSince, restartClock, startClock, track } from "@/lib/analytics";
 import { SOCIAL_PROVIDERS } from "@/lib/content";
-import { SIGNUP_HEADLINE, useVariant } from "@/lib/experiments";
+import { FLOW_SHAPE, type FlowVariant } from "@/lib/experiments";
 import { useSession } from "@/lib/session";
 
 const DEMO_EMAIL = "you@acme.com";
+
+/**
+ * Resolved straight from the URL, not via `useVariant`: this decides which page
+ * the user is sent to, so it can't tolerate `useVariant`'s one-render flash to
+ * "control" before the param is read.
+ */
+function resolveFlowVariant(): FlowVariant {
+  const asked = new URLSearchParams(window.location.search).get(FLOW_SHAPE.key);
+  return asked === "chat-first" ? "chat-first" : "control";
+}
 
 /**
  * One form behind two doors, same as the product: /signup and /login render
@@ -25,33 +35,22 @@ export function AuthScreen({
   const router = useRouter();
   const { update } = useSession();
   const [email, setEmail] = useState("");
-  const headline = useVariant(SIGNUP_HEADLINE);
 
   useEffect(() => {
     startClock("signup:landed");
-    const asked = new URLSearchParams(window.location.search).get(
-      SIGNUP_HEADLINE.key,
-    );
-    const shown =
-      asked && SIGNUP_HEADLINE.variants.includes(asked)
-        ? asked
-        : SIGNUP_HEADLINE.variants[0];
-    track("signup.headline_viewed", {
-      headlineVariant: shown,
-      authIntent: intent,
-    });
-  }, [intent]);
+  }, []);
 
   function signIn(provider: string, address: string) {
-    update({ signedIn: true, provider, email: address });
+    const variant = resolveFlowVariant();
+    update({ signedIn: true, provider, email: address, flowVariant: variant });
     track("signup.completed", {
       provider,
-      headlineVariant: headline,
       authIntent: intent,
       timeOnScreen: elapsedSince("signup:landed"),
     });
+    track("experiment.flow_shape_exposed", { variant });
     restartClock("signup:done");
-    router.push("/welcome");
+    router.push(variant === "chat-first" ? "/chat" : "/welcome");
   }
 
   const other = intent === "signup" ? "login" : "signup";
@@ -72,11 +71,7 @@ export function AuthScreen({
 
         <div className="bg-card flex flex-col gap-4 rounded-xl border p-6 shadow-xs">
           <h1 className="text-center text-base font-semibold">
-            {intent === "login"
-              ? "Welcome back"
-              : headline === "direct"
-                ? "Start catching what you said you'd do"
-                : "Create your account"}
+            {intent === "login" ? "Welcome back" : "Create your account"}
           </h1>
 
           {SOCIAL_PROVIDERS.map((provider) => (

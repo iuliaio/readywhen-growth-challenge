@@ -12,13 +12,21 @@ import { ReadywhenName } from "@/components/ui/readywhen";
 import { cn } from "@/helpers/utils";
 import {
   CANNED_REPLIES,
+  CHAT_FIRST_CONNECT_PROMPT,
+  CHAT_FIRST_OPENER,
   CONNECTORS,
   DRAFT_REPLY,
   FOUND_COMMITMENTS,
   openingLine,
   type Tool,
 } from "@/lib/content";
-import { elapsedSince, restartClock, toCountRange, track } from "@/lib/analytics";
+import {
+  elapsedSince,
+  restartClock,
+  toCountRange,
+  track,
+  type ConnectSource,
+} from "@/lib/analytics";
 import { useSession } from "@/lib/session";
 
 type Message =
@@ -32,12 +40,16 @@ export default function ChatPage() {
   const router = useRouter();
   const { session, ready, update } = useSession();
 
+  const chatFirst = session.flowVariant === "chat-first";
+  const connectSource: ConnectSource = chatFirst ? "chat_first" : "chat";
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState<Tool | null>(null);
   const [sent, setSent] = useState(false);
   const [replyIndex, setReplyIndex] = useState(0);
   const sends = useRef(0);
+  const askedToConnect = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,7 +62,12 @@ export default function ChatPage() {
   // timer cleared by that teardown — the connect card never appeared in dev.
   useEffect(() => {
     if (!ready || !session.signedIn) return;
-    setMessages([{ kind: "agent", text: openingLine(session.jtbd, session.firstName) }]);
+    setMessages([
+      {
+        kind: "agent",
+        text: chatFirst ? CHAT_FIRST_OPENER : openingLine(session.jtbd, session.firstName),
+      },
+    ]);
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     if (session.connected.length > 0) {
@@ -58,17 +75,17 @@ export default function ChatPage() {
         setTimeout(() => say({ kind: "agent", text: "Reading your last 30 days…" }), 400),
       );
       timers.push(setTimeout(() => revealCommitments(true), 1500));
-    } else {
+    } else if (!chatFirst) {
       timers.push(
         setTimeout(() => {
-          track("connector.picker_viewed", { source: "chat" });
+          track("connector.picker_viewed", { source: "chat", variant: session.flowVariant });
           restartClock("connector:picker");
           setMessages((prev) => [...prev, { kind: "connect" }]);
         }, 700),
       );
     }
     return () => timers.forEach(clearTimeout);
-  }, [ready, session.signedIn, session.jtbd, session.firstName]);
+  }, [ready, session.signedIn, session.jtbd, session.firstName, session.flowVariant, chatFirst]);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,7 +118,8 @@ export default function ChatPage() {
     update({ connected: [...session.connected, tool.slug] });
     track("connector.connected", {
       connector: tool.slug,
-      source: "chat",
+      source: connectSource,
+      variant: session.flowVariant,
       timeOnConsentScreen: elapsedSince("connector:consent"),
       timeSinceSignup: elapsedSince("signup:done"),
     });
@@ -119,8 +137,23 @@ export default function ChatPage() {
     track("chat.message_sent", {
       messageNumber: toCountRange(sends.current),
       firstConnector: session.connected[0] ?? "none",
+      variant: session.flowVariant,
     });
     say({ kind: "user", text: text.trim() });
+
+    // chat-first arm: the first message is the moment we ask for a connection,
+    // in place of control's timed connect card. Once only — later messages get
+    // the normal reply path.
+    if (chatFirst && session.connected.length === 0 && !askedToConnect.current) {
+      askedToConnect.current = true;
+      restartClock("connector:picker");
+      track("connector.picker_viewed", { source: "chat_first", variant: "chat-first" });
+      setTimeout(() => {
+        say({ kind: "agent", text: CHAT_FIRST_CONNECT_PROMPT }, { kind: "connect" });
+      }, 500);
+      return;
+    }
+
     const wantsDraft = /draft|reply|invoice|tom/i.test(text);
     setTimeout(() => {
       if (wantsDraft) {
@@ -164,7 +197,8 @@ export default function ChatPage() {
                     onPick={(tool) => {
                       track("connector.selected", {
                         connector: tool.slug,
-                        source: "chat",
+                        source: connectSource,
+                        variant: session.flowVariant,
                         timeToChoose: elapsedSince("connector:picker"),
                       });
                       restartClock("connector:consent");
@@ -238,7 +272,8 @@ export default function ChatPage() {
           onCancel={() => {
             track("connector.declined", {
               connector: pending.slug,
-              source: "chat",
+              source: connectSource,
+              variant: session.flowVariant,
               timeOnConsentScreen: elapsedSince("connector:consent"),
             });
             setPending(null);
