@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Check, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUp, Check, Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/AppShell";
+import { ConsentDialog } from "@/components/ConsentDialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReadywhenName } from "@/components/ui/readywhen";
@@ -20,15 +21,12 @@ import {
 import { elapsedSince, restartClock, toCountRange, track } from "@/lib/analytics";
 import { useSession } from "@/lib/session";
 
-/** Said once, the first time a source is connected. */
-const UNLOCK_MESSAGE =
-  "Your board and your 2nd Brain are open now — both are in the sidebar. The board is everything I'm tracking; the Brain is what I'm working out about your business.";
-
 type Message =
   | { kind: "agent" | "user"; text: string }
   | { kind: "connect" }
   | { kind: "commitments" }
-  | { kind: "draft" };
+  | { kind: "draft" }
+  | { kind: "boardCta" };
 
 export default function ChatPage() {
   const router = useRouter();
@@ -53,12 +51,23 @@ export default function ChatPage() {
   useEffect(() => {
     if (!ready || !session.signedIn) return;
     setMessages([{ kind: "agent", text: openingLine(session.jtbd, session.firstName) }]);
-    const timer = setTimeout(() => {
-      track("connector.picker_viewed", {});
-      restartClock("connector:picker");
-      setMessages((prev) => [...prev, { kind: "connect" }]);
-    }, 700);
-    return () => clearTimeout(timer);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (session.connected.length > 0) {
+      timers.push(
+        setTimeout(() => say({ kind: "agent", text: "Reading your last 30 days…" }), 400),
+      );
+      timers.push(setTimeout(() => revealCommitments(true), 1500));
+    } else {
+      timers.push(
+        setTimeout(() => {
+          track("connector.picker_viewed", { source: "chat" });
+          restartClock("connector:picker");
+          setMessages((prev) => [...prev, { kind: "connect" }]);
+        }, 700),
+      );
+    }
+    return () => timers.forEach(clearTimeout);
   }, [ready, session.signedIn, session.jtbd, session.firstName]);
 
   useEffect(() => {
@@ -71,6 +80,17 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, ...added]);
   }
 
+  function revealCommitments(announceUnlock: boolean) {
+    track("chat.commitments_viewed", {});
+    say(
+      { kind: "agent", text: "Done. Here's what you said you'd do and haven't closed yet." },
+      { kind: "commitments" },
+    );
+    if (announceUnlock) {
+      setTimeout(() => say({ kind: "boardCta" }), 900);
+    }
+  }
+
   function grantConsent(tool: Tool) {
     // The first connection is what ends onboarding: it is the moment readywhen
     // can see any work at all, so it is the moment the board and the 2nd Brain
@@ -81,6 +101,7 @@ export default function ChatPage() {
     update({ connected: [...session.connected, tool.slug] });
     track("connector.connected", {
       connector: tool.slug,
+      source: "chat",
       timeOnConsentScreen: elapsedSince("connector:consent"),
       timeSinceSignup: elapsedSince("signup:done"),
     });
@@ -88,16 +109,7 @@ export default function ChatPage() {
       kind: "agent",
       text: `${tool.name} connected. Give me a second while I read the last 30 days…`,
     });
-    setTimeout(() => {
-      track("chat.commitments_viewed", {});
-      say(
-        { kind: "agent", text: "Done. Here's what you said you'd do and haven't closed yet." },
-        { kind: "commitments" },
-      );
-      if (first) {
-        setTimeout(() => say({ kind: "agent", text: UNLOCK_MESSAGE }), 900);
-      }
-    }, 1100);
+    setTimeout(() => revealCommitments(first), 1100);
   }
 
   function send(text: string) {
@@ -152,6 +164,7 @@ export default function ChatPage() {
                     onPick={(tool) => {
                       track("connector.selected", {
                         connector: tool.slug,
+                        source: "chat",
                         timeToChoose: elapsedSince("connector:picker"),
                       });
                       restartClock("connector:consent");
@@ -161,6 +174,9 @@ export default function ChatPage() {
                   />
                 )}
                 {message.kind === "commitments" && <CommitmentsCard onAsk={send} />}
+                {message.kind === "boardCta" && (
+                  <BoardCtaCard onView={() => router.push("/inbox")} />
+                )}
                 {message.kind === "draft" && (
                   <DraftCard
                     sent={sent}
@@ -222,6 +238,7 @@ export default function ChatPage() {
           onCancel={() => {
             track("connector.declined", {
               connector: pending.slug,
+              source: "chat",
               timeOnConsentScreen: elapsedSince("connector:consent"),
             });
             setPending(null);
@@ -336,59 +353,23 @@ function DraftCard({ sent, onSend }: Readonly<{ sent: boolean; onSend: () => voi
   );
 }
 
-/** The provider's consent screen, faked. Nothing leaves the browser. */
-function ConsentDialog({
-  tool,
-  onAllow,
-  onCancel,
-}: Readonly<{ tool: Tool; onAllow: () => void; onCancel: () => void }>) {
-  const scopes = [
-    `Read your ${tool.name} messages and metadata`,
-    "Create drafts on your behalf",
-    "See who you exchange messages with",
-  ];
-
+function BoardCtaCard({ onView }: Readonly<{ onView: () => void }>) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        backdropFilter: "blur(4px)",
-        backgroundColor: "color-mix(in oklab, var(--foreground) 36%, transparent)",
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Connect ${tool.name}`}
+      className={cn(
+        AGENT_INDENT,
+        "bg-card flex max-w-md flex-col gap-3 rounded-xl border p-4 shadow-xs",
+      )}
     >
-      <div className="bg-background motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 flex w-full max-w-sm flex-col gap-5 rounded-2xl border p-6 shadow-2xl duration-200">
-        <div className="flex items-center gap-3">
-          <img src={tool.iconSrc} alt="" className="size-8 object-contain" />
-          <div>
-            <p className="text-sm font-semibold">Connect {tool.name}</p>
-            <p className="text-muted-foreground text-xs">
-              <ReadywhenName /> wants access to your {tool.name} account
-            </p>
-          </div>
-        </div>
-        <ul className="flex flex-col gap-2">
-          {scopes.map((scope) => (
-            <li key={scope} className="flex items-start gap-2 text-xs">
-              <Check className="text-brand mt-0.5 size-3.5 shrink-0" aria-hidden />
-              {scope}
-            </li>
-          ))}
-        </ul>
-        <p className="text-muted-foreground text-[11px]">
-          This is a mock. No account is contacted and nothing leaves your browser.
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="brand" onClick={onAllow}>
-            Allow
-          </Button>
-        </div>
-      </div>
+      <p className="text-sm font-medium">Your board and 2nd Brain are ready</p>
+      <p className="text-muted-foreground text-xs">
+        The board is everything I&apos;m tracking. The Brain is what I&apos;m working out about your
+        business. Both are in the sidebar.
+      </p>
+      <Button variant="brand" size="sm" className="group w-fit" onClick={onView}>
+        View your board
+        <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </Button>
     </div>
   );
 }

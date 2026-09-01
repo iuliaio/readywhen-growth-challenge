@@ -2,6 +2,7 @@ import { recordBusinessEvent, type BusinessEventTags } from "./metrics";
 
 type AuthIntent = "login" | "signup";
 type OnboardingStep = "org" | "profile" | "explainer" | "tools" | "slips";
+type ConnectSource = "welcome" | "chat";
 
 export type TimeSpan =
   | "<2s"
@@ -30,11 +31,16 @@ export type FunnelEvents = {
     direction: "back";
     timeOnStep: TimeSpan;
   };
-  "connector.picker_viewed": NoTags;
-  "connector.selected": { connector: string; timeToChoose: TimeSpan };
-  "connector.declined": { connector: string; timeOnConsentScreen: TimeSpan };
+  "connector.picker_viewed": { source: ConnectSource };
+  "connector.selected": { connector: string; source: ConnectSource; timeToChoose: TimeSpan };
+  "connector.declined": {
+    connector: string;
+    source: ConnectSource;
+    timeOnConsentScreen: TimeSpan;
+  };
   "connector.connected": {
     connector: string;
+    source: ConnectSource;
     timeOnConsentScreen: TimeSpan;
     timeSinceSignup: TimeSpan;
   };

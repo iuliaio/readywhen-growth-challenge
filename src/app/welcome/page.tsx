@@ -5,9 +5,11 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { AppShell, OnboardingCard } from "@/components/AppShell";
+import { ConsentDialog } from "@/components/ConsentDialog";
 import { elapsedSince, restartClock, track } from "@/lib/analytics";
+import { type Tool } from "@/lib/content";
 import { useSession } from "@/lib/session";
-import { ExplainerStep, OrgNameStep, ProfileStep, SlipsStep, ToolsStep } from "./steps";
+import { ConnectStep, ExplainerStep, OrgNameStep, ProfileStep, SlipsStep } from "./steps";
 
 const STEPS = ["org", "profile", "explainer", "tools", "slips"] as const;
 type Step = (typeof STEPS)[number];
@@ -20,7 +22,7 @@ export default function WelcomePage() {
   const router = useRouter();
   const { session, ready, update } = useSession();
   const [step, setStep] = useState<Step>("org");
-  const [other, setOther] = useState("");
+  const [pendingConnect, setPendingConnect] = useState<Tool | null>(null);
 
   useEffect(() => {
     if (ready && !session.signedIn) router.replace("/signup");
@@ -29,6 +31,10 @@ export default function WelcomePage() {
   useEffect(() => {
     restartClock(`step:${step}`);
     track("onboarding.step_viewed", { step });
+    if (step === "tools") {
+      restartClock("connector:picker");
+      track("connector.picker_viewed", { source: "welcome" });
+    }
   }, [step]);
 
   if (!ready || !session.signedIn) return null;
@@ -85,22 +91,18 @@ export default function WelcomePage() {
         {step === "explainer" && <ExplainerStep onContinue={next} />}
 
         {step === "tools" && (
-          <ToolsStep
-            selected={session.tools}
-            other={other}
-            onOtherChange={setOther}
-            onToggle={(slug) =>
-              update({
-                tools: session.tools.includes(slug)
-                  ? session.tools.filter((item) => item !== slug)
-                  : [...session.tools, slug],
-              })
-            }
-            onContinue={() => {
-              const extra = other.trim();
-              if (extra) update({ tools: [...session.tools, extra] });
-              next();
+          <ConnectStep
+            connected={session.connected}
+            onPick={(tool) => {
+              track("connector.selected", {
+                connector: tool.slug,
+                source: "welcome",
+                timeToChoose: elapsedSince("connector:picker"),
+              });
+              restartClock("connector:consent");
+              setPendingConnect(tool);
             }}
+            onContinue={next}
             onBack={back}
           />
         )}
@@ -122,6 +124,30 @@ export default function WelcomePage() {
           />
         )}
       </OnboardingCard>
+
+      {pendingConnect && (
+        <ConsentDialog
+          tool={pendingConnect}
+          onCancel={() => {
+            track("connector.declined", {
+              connector: pendingConnect.slug,
+              source: "welcome",
+              timeOnConsentScreen: elapsedSince("connector:consent"),
+            });
+            setPendingConnect(null);
+          }}
+          onAllow={() => {
+            update({ connected: [...session.connected, pendingConnect.slug] });
+            track("connector.connected", {
+              connector: pendingConnect.slug,
+              source: "welcome",
+              timeOnConsentScreen: elapsedSince("connector:consent"),
+              timeSinceSignup: elapsedSince("signup:done"),
+            });
+            setPendingConnect(null);
+          }}
+        />
+      )}
     </>
   );
 }

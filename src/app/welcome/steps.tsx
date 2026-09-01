@@ -9,7 +9,14 @@ import { Input } from "@/components/ui/input";
 import { SurveySelect } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Readywhen } from "@/components/ui/readywhen";
-import { EXPLAINER_SCREENS, JTBD_OPTIONS, SURVEY_FIELDS, WORK_TOOLS } from "@/lib/content";
+import {
+  CONNECTORS,
+  EXPLAINER_SCREENS,
+  JTBD_OPTIONS,
+  SURVEY_FIELDS,
+  WORK_TOOLS,
+  type Tool,
+} from "@/lib/content";
 
 function StepHeader({ title, sub }: Readonly<{ title: string; sub?: ReactNode }>) {
   return (
@@ -355,67 +362,60 @@ function CloseArt() {
   );
 }
 
-/** Step 4 — where does your work happen. Selection only, nothing connects here. */
-export function ToolsStep({
-  selected,
-  onToggle,
-  other,
-  onOtherChange,
+/** Step 4 — connect the one place most of your commitments live. The consent
+ *  dialog and the write to `session.connected` are owned by the page. */
+export function ConnectStep({
+  connected,
+  onPick,
   onContinue,
   onBack,
 }: Readonly<{
-  selected: string[];
-  onToggle: (slug: string) => void;
-  other: string;
-  onOtherChange: (value: string) => void;
+  connected: string[];
+  onPick: (tool: Tool) => void;
   onContinue: () => void;
   onBack: () => void;
 }>) {
+  const hasConnected = connected.length > 0;
+
   return (
     <div className="flex w-full flex-col gap-8">
       <StepHeader
-        title="Where does your work happen?"
+        title="Where do most of your commitments come from?"
         sub={
           <>
-            <Readywhen />
-            keeps an eye on the places you already work and catches what you said you&apos;d do, so
-            nothing slips through the cracks. Pick the tools you use.
+            Connect one place and <Readywhen /> starts finding what you said you&apos;d do. You can
+            add the rest later.
           </>
         }
       />
 
-      <ul className="grid grid-cols-3 gap-3">
-        {WORK_TOOLS.map((tool) => {
-          const on = selected.includes(tool.slug);
+      <ul className="flex flex-col gap-2.5">
+        {CONNECTORS.map((tool) => {
+          const on = connected.includes(tool.slug);
           return (
             <li key={tool.slug}>
               <button
                 type="button"
-                aria-pressed={on}
-                aria-label={`${tool.name}${on ? " — selected" : ""}`}
-                onClick={() => onToggle(tool.slug)}
+                disabled={on}
+                aria-label={`Connect ${tool.name}${on ? " — connected" : ""}`}
+                onClick={() => onPick(tool)}
                 className={cn(
-                  "focus-visible:ring-ring relative flex w-full items-center justify-between gap-2.5 rounded-xl border px-3.5 py-3 text-left transition focus:outline-none focus-visible:ring-2",
+                  "focus-visible:ring-ring flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition focus:outline-none focus-visible:ring-2",
                   on
                     ? "border-brand bg-brand/5"
                     : "border-input bg-card shadow-xs hover:-translate-y-0.5 hover:shadow-sm",
                 )}
               >
                 <img src={tool.iconSrc} alt="" className="size-6 shrink-0 object-contain" />
-                {/* Hidden on phones: at 3 columns the label truncates to one
-                    meaningless glyph. The icon carries recognition; the name
-                    stays in the button's aria-label. */}
-                <span className="hidden min-w-0 flex-1 truncate text-sm font-medium sm:block">
-                  {tool.name}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{tool.name}</span>
                 <span
-                  aria-hidden
                   className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded-full transition",
-                    on ? "bg-brand" : "border-input border",
+                    "flex items-center gap-1.5 text-xs font-medium",
+                    on ? "text-brand" : "text-muted-foreground",
                   )}
                 >
-                  {on && <Check className="text-brand-foreground size-3" strokeWidth={3} />}
+                  {on && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
+                  {on ? "Connected" : "Connect"}
                 </span>
               </button>
             </li>
@@ -423,19 +423,14 @@ export function ToolsStep({
         })}
       </ul>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-muted-foreground text-xs font-medium">Use something else?</span>
-        <Input
-          value={other}
-          onChange={(event) => onOtherChange(event.target.value)}
-          placeholder="Add a tool, e.g. Linear, Intercom, Zoom"
-          aria-label="Other tools you use"
-        />
-      </label>
-
       <Footer onBack={onBack}>
-        <Button type="button" onClick={onContinue} className="group">
-          Continue
+        <Button
+          type="button"
+          variant={hasConnected ? "brand" : "ghost"}
+          onClick={onContinue}
+          className="group"
+        >
+          {hasConnected ? "Continue" : "Skip for now"}
           <ArrowRight className="transition-transform group-hover:translate-x-0.5" aria-hidden />
         </Button>
       </Footer>

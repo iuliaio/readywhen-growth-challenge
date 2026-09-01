@@ -23,7 +23,6 @@ export interface Session {
   firstName: string;
   lastName: string;
   survey: Record<string, string>;
-  tools: string[];
   jtbd: string | null;
   jtbdDetail: string;
   connected: string[];
@@ -40,7 +39,6 @@ export const EMPTY_SESSION: Session = {
   firstName: "",
   lastName: "",
   survey: {},
-  tools: [],
   jtbd: null,
   jtbdDetail: "",
   connected: [],
