@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { AppShell, OnboardingCard } from "@/components/AppShell";
+import { elapsedSince, restartClock, track } from "@/lib/analytics";
 import { useSession } from "@/lib/session";
 import { ExplainerStep, OrgNameStep, ProfileStep, SlipsStep, ToolsStep } from "./steps";
 
@@ -25,10 +26,27 @@ export default function WelcomePage() {
     if (ready && !session.signedIn) router.replace("/signup");
   }, [ready, session.signedIn, router]);
 
+  useEffect(() => {
+    restartClock(`step:${step}`);
+    track("onboarding.step_viewed", { step });
+  }, [step]);
+
   if (!ready || !session.signedIn) return null;
 
-  const next = () => setStep(STEPS[STEPS.indexOf(step) + 1]);
-  const back = () => setStep(STEPS[STEPS.indexOf(step) - 1]);
+  const stepIndex = STEPS.indexOf(step);
+
+  const next = () => {
+    track("onboarding.step_completed", { step, timeOnStep: elapsedSince(`step:${step}`) });
+    setStep(STEPS[stepIndex + 1]);
+  };
+  const back = () => {
+    track("onboarding.step_left", {
+      step,
+      direction: "back",
+      timeOnStep: elapsedSince(`step:${step}`),
+    });
+    setStep(STEPS[stepIndex - 1]);
+  };
 
   return (
     <>
@@ -93,7 +111,13 @@ export default function WelcomePage() {
             onSelect={(jtbd) => update({ jtbd })}
             detail={session.jtbdDetail}
             onDetailChange={(jtbdDetail) => update({ jtbdDetail })}
-            onContinue={() => router.push("/chat")}
+            onContinue={() => {
+              track("onboarding.step_completed", {
+                step: "slips",
+                timeOnStep: elapsedSince("step:slips"),
+              });
+              router.push("/chat");
+            }}
             onBack={back}
           />
         )}

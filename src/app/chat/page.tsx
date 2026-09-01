@@ -17,6 +17,7 @@ import {
   openingLine,
   type Tool,
 } from "@/lib/content";
+import { elapsedSince, restartClock, toCountRange, track } from "@/lib/analytics";
 import { useSession } from "@/lib/session";
 
 /** Said once, the first time a source is connected. */
@@ -38,6 +39,7 @@ export default function ChatPage() {
   const [pending, setPending] = useState<Tool | null>(null);
   const [sent, setSent] = useState(false);
   const [replyIndex, setReplyIndex] = useState(0);
+  const sends = useRef(0);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +53,11 @@ export default function ChatPage() {
   useEffect(() => {
     if (!ready || !session.signedIn) return;
     setMessages([{ kind: "agent", text: openingLine(session.jtbd, session.firstName) }]);
-    const timer = setTimeout(() => setMessages((prev) => [...prev, { kind: "connect" }]), 700);
+    const timer = setTimeout(() => {
+      track("connector.picker_viewed", {});
+      restartClock("connector:picker");
+      setMessages((prev) => [...prev, { kind: "connect" }]);
+    }, 700);
     return () => clearTimeout(timer);
   }, [ready, session.signedIn, session.jtbd, session.firstName]);
 
@@ -73,11 +79,17 @@ export default function ChatPage() {
     const first = session.connected.length === 0;
     setPending(null);
     update({ connected: [...session.connected, tool.slug] });
+    track("connector.connected", {
+      connector: tool.slug,
+      timeOnConsentScreen: elapsedSince("connector:consent"),
+      timeSinceSignup: elapsedSince("signup:done"),
+    });
     say({
       kind: "agent",
       text: `${tool.name} connected. Give me a second while I read the last 30 days…`,
     });
     setTimeout(() => {
+      track("chat.commitments_viewed", {});
       say(
         { kind: "agent", text: "Done. Here's what you said you'd do and haven't closed yet." },
         { kind: "commitments" },
@@ -91,10 +103,16 @@ export default function ChatPage() {
   function send(text: string) {
     if (!text.trim()) return;
     setInput("");
+    sends.current += 1;
+    track("chat.message_sent", {
+      messageNumber: toCountRange(sends.current),
+      firstConnector: session.connected[0] ?? "none",
+    });
     say({ kind: "user", text: text.trim() });
     const wantsDraft = /draft|reply|invoice|tom/i.test(text);
     setTimeout(() => {
       if (wantsDraft) {
+        track("chat.draft_viewed", {});
         say({ kind: "agent", text: "On it. Here's the draft, in your voice." }, { kind: "draft" });
         return;
       }
@@ -130,7 +148,17 @@ export default function ChatPage() {
                   </div>
                 )}
                 {message.kind === "connect" && (
-                  <ConnectCard onPick={setPending} connected={session.connected} />
+                  <ConnectCard
+                    onPick={(tool) => {
+                      track("connector.selected", {
+                        connector: tool.slug,
+                        timeToChoose: elapsedSince("connector:picker"),
+                      });
+                      restartClock("connector:consent");
+                      setPending(tool);
+                    }}
+                    connected={session.connected}
+                  />
                 )}
                 {message.kind === "commitments" && <CommitmentsCard onAsk={send} />}
                 {message.kind === "draft" && (
@@ -138,6 +166,7 @@ export default function ChatPage() {
                     sent={sent}
                     onSend={() => {
                       setSent(true);
+                      track("chat.draft_sent", {});
                       say({
                         kind: "agent",
                         text: "Sent. I'll watch for Tom's reply and close the loop when it lands.",
@@ -190,7 +219,13 @@ export default function ChatPage() {
       {pending && (
         <ConsentDialog
           tool={pending}
-          onCancel={() => setPending(null)}
+          onCancel={() => {
+            track("connector.declined", {
+              connector: pending.slug,
+              timeOnConsentScreen: elapsedSince("connector:consent"),
+            });
+            setPending(null);
+          }}
           onAllow={() => grantConsent(pending)}
         />
       )}

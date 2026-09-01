@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { AppShell, Board } from "@/components/AppShell";
+import { elapsedSince, track } from "@/lib/analytics";
 import { isUnlocked, useSession } from "@/lib/session";
 
 /** The board, once there is something to put on it. Locked until a source is
@@ -11,14 +12,22 @@ import { isUnlocked, useSession } from "@/lib/session";
 export default function InboxPage() {
   const router = useRouter();
   const { session, ready } = useSession();
+  const unlocked = isUnlocked(session);
 
   useEffect(() => {
     if (!ready) return;
     if (!session.signedIn) router.replace("/signup");
-    else if (!isUnlocked(session)) router.replace("/chat");
-  }, [ready, session, router]);
+    else if (!unlocked) router.replace("/chat");
+  }, [ready, session.signedIn, unlocked, router]);
 
-  if (!ready || !session.signedIn || !isUnlocked(session)) return null;
+  const firstConnector = session.connected[0] ?? "none";
+  useEffect(() => {
+    if (ready && session.signedIn && unlocked) {
+      track("board.viewed", { firstConnector, timeSinceSignup: elapsedSince("signup:done") });
+    }
+  }, [ready, session.signedIn, unlocked, firstConnector]);
+
+  if (!ready || !session.signedIn || !unlocked) return null;
 
   return (
     <AppShell>
